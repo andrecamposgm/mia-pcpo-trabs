@@ -31,6 +31,7 @@ public class Model {
 		super();
 		this.graph = graph;
 		cplex 		= new IloCplex();
+        cplex.setOut(null);
 		demands 	= graph.demands;
 		arcs 		= graph.arcs;
 		nodes		= graph.nodes;
@@ -46,15 +47,16 @@ public class Model {
 	public double calculateObjectiveFunction(double[] mi) throws IloException {
 		
 		//// funcao objetivo
-		// custo fixo
+
 		IloLinearNumExpr cost = cplex.linearNumExpr();
-		objectiveFixedCosts(cost);
-		
-		// custo variavel
-		objectiveVariableCosts(cost);
-		
+        // custo variavel
+        objectiveVariableCosts(cost);
+
+        // custo fixo
+        objectiveFixedCosts(cost);
+
 		// funcao relaxada
-		relaxedCapacityFunction(mi);
+		relaxedCapacityFunction(cost,mi);
 		
 		try {
 			cplex.addMinimize(cost);
@@ -66,14 +68,12 @@ public class Model {
 	}
 
 
-	private void relaxedCapacityFunction(double[] mi) throws IloException {
-		IloLinearNumExpr relaxedCapacityFunction;
+	private void relaxedCapacityFunction(IloLinearNumExpr cost, double[] mi) throws IloException {
 		for(Arc arc : arcs) {
-			relaxedCapacityFunction = cplex.linearNumExpr();
 			for (int k = 0; k < demands.length; k++) {
-				relaxedCapacityFunction.addTerm(mi[arc.id], x[k][arc.id]);
+                cost.addTerm(mi[arc.id], x[k][arc.id]);
 			}
-			relaxedCapacityFunction.addTerm(-arc.capacity * mi[arc.id], y[arc.id]);
+            cost.addTerm(-mi[arc.id] * arc.capacity, y[arc.id]);
 		}
 	}
 

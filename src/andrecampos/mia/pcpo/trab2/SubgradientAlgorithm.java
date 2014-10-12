@@ -4,7 +4,6 @@ import static java.lang.Math.max;
 import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
 import ilog.concert.IloException;
-import ilog.cplex.IloCplex.UnknownObjectException;
 import andrecampos.mia.pcpo.data.Arc;
 import andrecampos.mia.pcpo.data.Graph;
 
@@ -17,11 +16,9 @@ public class SubgradientAlgorithm {
 	private final int maxIteractions; 	//K
 	private final Graph graph;
 	private Model model; 
-	private final double epson; 		// 
-	private double upperBound;
-	private final double [] miK;
-	private final double [] miKNext;
-	private double[] gama;
+	private final double epson;
+	private final double [] muK;
+	private final double [] muKNext;
 	private int maxNoProgress;
 	
 	public SubgradientAlgorithm(Graph graph, int maxIteractions) throws IloException {
@@ -30,80 +27,95 @@ public class SubgradientAlgorithm {
 		this.maxIteractions = maxIteractions;
 		epson 				= 0.000001d;
 		maxNoProgress 		= 10;
-		miK 				= new double[graph.arcs.length]; // por padrao, tudo zero
-		miKNext				= new double[graph.arcs.length]; // por padrao, tudo zero
+		muK = new double[graph.arcs.length]; // por padrao, tudo zero
+		muKNext = new double[graph.arcs.length]; // por padrao, tudo zero
 		
 		startSubgradient();
 	}
 	
 	private void startSubgradient() throws IloException {
-		upperBound 			= calculateUpperBound();
-		gama     		    = new double[graph.arcs.length];
+		double upperBound 	= calculateUpperBound();
+        double[] gama       = new double[graph.arcs.length];
 		
-		double lMu			= 0; // L(mi(k))
-		double lambda 		= 2;
-		double tetaK 		= 0;
-		
+		double lMu;         // L(mu))
+        double teta;
+        double lambda 		= 2;
+
+
 		int noProgressCount = 0;
-		for(int iteration = 0; iteration < maxIteractions; iteration++) { //
-			model 		= new Model(graph); // como reutilizar o modelo
+        double gap;
+        for(int iteration = 0; iteration < maxIteractions; iteration++) { //
+            // TODO ver no cplex como reutilizar remover a funcao de custo para poder reutilizar o modelo.
+            model 		= new Model(graph);
+            lMu   		= model.calculateObjectiveFunction(muK);
 			
-			lMu   		= model.calculateObjectiveFunction(miK);
+			calculateSubgradient(gama);
+
+            teta = lambda * (upperBound - lMu) / euclidianNormSqr(gama);
+
+            gap = (upperBound - lMu) / (upperBound+1.0E-32d);
+            System.out.println("Upper Bound: "+upperBound);
+            System.out.println("Lower Bound: "+lMu);
+            System.out.println("Gap: "+gap);
+
+            calculateMiKNext(teta, gama);
 			
-			calculateSubgradient();
-			
-			tetaK =  lambda * ( upperBound - lMu) / euclidianNormSqr(gama) ;
-			
-			calculateMiKNext(tetaK);
-			
-			if(normMiK_MiKNext() < epson) { 
+			if(normMuKandMuKNext() < epson) {
 				break;
 			}
-			
+
+            copy(muKNext, muK);
+
 			if(++noProgressCount > maxNoProgress) { 
 				lambda /= 2;
 				noProgressCount = 0;
-			} 
+			}
+
 		}
 		
 	}
 
-	private void calculateSubgradient() throws UnknownObjectException, IloException {
-		double[][] x;
-		double[] y;
-		x = model.getX();
-		y = model.getY();
+    private void copy(double[] miKNext, double[] miK) {
+        for (int i = 0; i < miKNext.length; i++) {
+            miK[i] = miKNext[i];
+        }
+    }
+
+    private void calculateSubgradient(double [] gama) throws IloException {
+		double[][]  x = model.getX();
+        double[]    y = model.getY();
+
 		for (Arc arc : graph.arcs) {
-			gama[arc.id] = arc.capacity * y[arc.id]; 
+			gama[arc.id] = -arc.capacity * y[arc.id];
 			for (double arcFlow : x[arc.id]) {
 				gama[arc.id] += arcFlow; 
 			}
 		}
 	}
 
-	private double normMiK_MiKNext() {
+
+	private double normMuKandMuKNext() {
 		double norm = 0;
-		for (int i = 0; i < miK.length; i++) {
-			norm += pow((miKNext[i] - miK[i]),2);
+		for (int i = 0; i < muK.length; i++) {
+			norm += pow((muKNext[i] - muK[i]),2);
 		}
 		return sqrt(norm);
 	}
 
-	private void calculateMiKNext(double tetaK) {
-		for (int i = 0; i < miK.length; i++) {
-			miKNext[i] = max(0d, (double) (miK[i] + tetaK * gama[i]));
+	private void calculateMiKNext(double teta, double [] gama) {
+		for (int i = 0; i < muK.length; i++) {
+			muKNext[i] = max(0d, (double) (muK[i] + teta * gama[i]));
 		}
 	}
 
 	private double euclidianNormSqr(double[] grandient) {
 		double sum = 0;
 		for (double d : grandient) {
-			sum += Math.abs(d);
+			sum += Math.pow(d, 2);
 		}
-		return Math.pow(sum, 2);
+		return sum;
 	}
 	
-
 	private double calculateUpperBound() throws IloException {
 		ModelUpperBound ub = new ModelUpperBound(graph);
 		ub.solve();
