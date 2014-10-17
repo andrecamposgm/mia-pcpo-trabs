@@ -6,6 +6,9 @@ import static java.lang.Math.sqrt;
 import ilog.concert.IloException;
 import andrecampos.mia.pcpo.data.Arc;
 import andrecampos.mia.pcpo.data.Graph;
+import ilog.cplex.IloCplex;
+
+import java.io.OutputStream;
 
 /**
  * 
@@ -38,18 +41,20 @@ public class SubgradientAlgorithm {
         double[] gama       = new double[graph.arcs.length];
 		
 		double lMu;         // L(mu))
-        double teta;
+        double teta         = 0;
         double lambda 		= 2;
 
 
 		int noProgressCount = 0;
         double gap;
         for(int iteration = 0; iteration < maxIteractions; iteration++) { //
-            // TODO ver no cplex como reutilizar remover a funcao de custo para poder reutilizar o modelo.
             model 		= new Model(graph);
             lMu   		= model.calculateObjectiveFunction(muK);
 			
 			calculateSubgradient(gama);
+            if( isUpdateUB(gama) ) {
+                upperBound = calculateNewUpperBound();
+            }
 
             teta = lambda * (upperBound - lMu) / euclidianNormSqr(gama);
 
@@ -71,9 +76,38 @@ public class SubgradientAlgorithm {
 				noProgressCount = 0;
 			}
 
+            model.clearObjective();
 		}
 		
 	}
+
+    private double calculateNewUpperBound() throws IloException {
+        double[][]  x = model.getX();
+        double[]    y = model.getY();
+
+        Arc [] arcs = graph.arcs;
+        double newUB = 0;
+        for (int k = 0; k < graph.demands.length; k++) {
+            for (int i = 0; i < arcs.length; i++) {
+                newUB += arcs[i].variableCost* x[k][i];
+            }
+        }
+
+        for (int i = 0; i < arcs.length; i++) {
+            newUB += y[i] * arcs[i].fixedCost;
+        }
+
+        return newUB;
+    }
+
+    private boolean isUpdateUB(double[] gama) {
+        for (int i = 0; i < gama.length ; i++) {
+            if(gama[i] >= 0 ) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     private void copy(double[] miKNext, double[] miK) {
         for (int i = 0; i < miKNext.length; i++) {

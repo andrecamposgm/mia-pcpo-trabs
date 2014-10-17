@@ -45,27 +45,22 @@ public class Model {
 	 * @throws IloException
 	 */
 	public double calculateObjectiveFunction(double[] mi) throws IloException {
-		
 		//// funcao objetivo
-
 		IloLinearNumExpr cost = cplex.linearNumExpr();
         // custo variavel
         objectiveVariableCosts(cost);
-
         // custo fixo
         objectiveFixedCosts(cost);
-
 		// funcao relaxada
 		relaxedCapacityFunction(cost,mi);
-		
-		try {
-			cplex.addMinimize(cost);
-			cplex.solve();
-			return cplex.getObjValue();
-		} finally { 
-			cplex.delete(cost); // ensures the minimize function will be removed
-		}
+        cplex.addMinimize(cost);
+        cplex.solve();
+        return cplex.getObjValue();
 	}
+
+    public void clearObjective() throws IloException {
+        cplex.remove(cplex.getObjective()); // ensures the minimize function will be removed
+    }
 
 
 	private void relaxedCapacityFunction(IloLinearNumExpr cost, double[] mi) throws IloException {
