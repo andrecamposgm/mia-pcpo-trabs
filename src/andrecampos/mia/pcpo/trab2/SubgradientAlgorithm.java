@@ -3,12 +3,11 @@ package andrecampos.mia.pcpo.trab2;
 import static java.lang.Math.max;
 import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
+
+import andrecampos.mia.pcpo.trab1.Model;
 import ilog.concert.IloException;
 import andrecampos.mia.pcpo.data.Arc;
 import andrecampos.mia.pcpo.data.Graph;
-import ilog.cplex.IloCplex;
-
-import java.io.OutputStream;
 
 /**
  * 
@@ -18,11 +17,12 @@ public class SubgradientAlgorithm {
 
 	private final int maxIteractions; 	//K
 	private final Graph graph;
-	private Model model; 
+	private ModelLagragianRelaxed model;
 	private final double epson;
 	private final double [] muK;
 	private final double [] muKNext;
 	private int maxNoProgress;
+    private long time = System.currentTimeMillis();
 	
 	public SubgradientAlgorithm(Graph graph, int maxIteractions) throws IloException {
 		super();
@@ -39,16 +39,16 @@ public class SubgradientAlgorithm {
 	private void startSubgradient() throws IloException {
 		double upperBound 	= calculateUpperBound();
         double[] gama       = new double[graph.arcs.length];
-		
-		double lMu;         // L(mu))
+
+        double lMu          = 0;         // L(mu))
         double teta         = 0;
+        double gap          = 0;
         double lambda 		= 2;
 
-
-		int noProgressCount = 0;
-        double gap;
+        int noProgressCount = 0;
+        model 		= new ModelLagragianRelaxed(graph);
         for(int iteration = 0; iteration < maxIteractions; iteration++) { //
-            model 		= new Model(graph);
+            printStatistics(lMu, upperBound, gap, iteration);
             lMu   		= model.calculateObjectiveFunction(muK);
 			
 			calculateSubgradient(gama);
@@ -58,10 +58,7 @@ public class SubgradientAlgorithm {
 
             teta = lambda * (upperBound - lMu) / euclidianNormSqr(gama);
 
-            gap = (upperBound - lMu) / (upperBound+1.0E-32d);
-            System.out.println("Upper Bound: "+upperBound);
-            System.out.println("Lower Bound: "+lMu);
-            System.out.println("Gap: "+gap);
+            gap = (upperBound - lMu) / (lMu);
 
             calculateMiKNext(teta, gama);
 			
@@ -75,11 +72,25 @@ public class SubgradientAlgorithm {
 				lambda /= 2;
 				noProgressCount = 0;
 			}
-
             model.clearObjective();
 		}
-		
+
+        ModelLinearRelaxed model = new ModelLinearRelaxed(graph);
+        model.solve();
+        System.out.println("Modelo relaxado linear:"+model.getObjectiveValue());
+
 	}
+
+    private void printStatistics(double lb, double up, double gap, int iteration) {
+        System.out.println("Iteration: "+iteration);
+        System.out.println("Upper Bound: "+up);
+        System.out.println("Lower Bound: "+lb);
+        System.out.println("Gap: "+gap);
+        long now = System.currentTimeMillis();
+        System.out.println("Time: "+(now - time)+" ms");
+        System.out.println("--------------------------------------------");
+        time = now;
+    }
 
     private double calculateNewUpperBound() throws IloException {
         double[][]  x = model.getX();
@@ -145,7 +156,7 @@ public class SubgradientAlgorithm {
 	private double euclidianNormSqr(double[] grandient) {
 		double sum = 0;
 		for (double d : grandient) {
-			sum += Math.pow(d, 2);
+			sum += pow(d, 2);
 		}
 		return sum;
 	}
