@@ -22,14 +22,14 @@ import andrecampos.mia.pcpo.data.Node;
  */
 public class Model {
 
-	private final Graph 	graph;
-	private final IloCplex 	cplex;
-	
-	private final Demand[] 	demands;
-	private final Arc[] 		arcs;
-	private final Node[] 		nodes;
-	private IloIntVar[] y;
-	private IloNumVar[][] x;
+    protected final Graph 	graph;
+    protected final IloCplex 	cplex;
+
+	protected final Demand[] 	demands;
+    protected final Arc[] 		arcs;
+    protected final Node[] 		nodes;
+    protected IloNumVar[] y;
+    protected IloNumVar[][] x;
 
 	public Model(Graph graph) throws IloException {
 		super();
@@ -67,7 +67,7 @@ public class Model {
 		}
 	}
 
-	private void defineYVariables() throws IloException {
+	protected void defineYVariables() throws IloException {
 		// Definicao das variaveis binarias yij que indicam se o arco e' utilizado ou nao
 		y = new IloIntVar[arcs.length];
 		for(Arc arc : arcs) {
