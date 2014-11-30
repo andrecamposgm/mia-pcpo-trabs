@@ -3,7 +3,8 @@ package andrecampos.mia.pcpo.data;
 import java.util.Scanner;
 
 /**
- * Cada uma das m linhas seguintes possui uma quintupla que caracteriza um arco: i	j	custoFixo	custoVariavel	capacidade
+ * Cada uma das m linhas seguintes possui uma quintupla que caracteriza um
+ * arco: i	j	custoFixo	custoVariavel	capacidade
  * @author Andre Campos
  */
 public class Arc {
